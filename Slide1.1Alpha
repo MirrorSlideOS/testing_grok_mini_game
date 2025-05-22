@@ -1,0 +1,340 @@
+Update 1.1 Alpha Level 1 and 2
+
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+</head>
+<body style="background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden;">
+<script>
+let player, dreams, vortexes, balls, score, timer, gameState, level;
+let dreamsSeeded = 0;
+let vortexesHit = 0;
+let vortexesCollected = 0;
+let mouseHistory = [];
+let transitionTimer = 0;
+const DREAM_POINTS = 10;
+const VORTEX_PENALTY = 5;
+const VORTEX_COLLECT_POINTS = 5;
+const BALL_COUNT = 10;
+const GAME_TIME = 60; // seconds per level
+const LAG_TIME = 3; // 3 seconds lag for Level 2
+const TRANSITION_TIME = 3; // 3 seconds for transition screen
+
+function setup() {
+  createCanvas(600, 400);
+  gameState = 'cover'; // Start with cover page
+  level = 1; // Start at Level 1
+  resetGame();
+}
+
+function resetGame() {
+  player = { x: width / 2, y: height / 2, size: 20, speed: 5 };
+  dreams = [];
+  vortexes = [];
+  balls = [];
+  mouseHistory = [];
+  score = 0;
+  timer = GAME_TIME;
+  dreamsSeeded = 0;
+  vortexesHit = 0;
+  vortexesCollected = 0;
+  level = 1;
+  gameState = 'playing';
+  
+  // Spawn initial dreams and vortexes for Level 1
+  for (let i = 0; i < 5; i++) {
+    dreams.push(createDream());
+    vortexes.push(createVortex());
+  }
+  loop();
+}
+
+function setupLevel2() {
+  player = { x: width / 2, y: height / 2, size: 30 };
+  dreams = [];
+  vortexes = [];
+  balls = [];
+  mouseHistory = [];
+  timer = GAME_TIME;
+  
+  // Spawn Level 1 objects for collection
+  for (let i = 0; i < 5; i++) {
+    dreams.push(createDream());
+    vortexes.push(createVortex());
+  }
+  
+  // Spawn colorful balls for Level 2
+  for (let i = 0; i < BALL_COUNT; i++) {
+    balls.push(createBall());
+  }
+}
+
+function draw() {
+  // Adjust background based on level
+  if (level === 1) background(10, 20, 40); // Darker cosmic blue for Level 1
+  else background(20, 30, 50); // Slightly brighter for Level 2
+  
+  if (gameState === 'cover') {
+    // Cover page
+    textAlign(CENTER);
+    textSize(32);
+    fill(0, 255, 255); // Neon cyan
+    text('👾 Sh∆ckOS: DrΞamC∆re SΞeder ⊼', width / 2, height / 2 - 120);
+    
+    textSize(20);
+    fill(255, 255, 0); // Yellow
+    text('∆bjective:', width / 2, height / 2 - 80);
+    text('LΞvel 1: SΞed DrΞams 🌟, ∆v∆id V∆rtexes 🕳️', width / 2, height / 2 - 50);
+    text('LΞvel 2: Ch∆se as Pyr∆mid, C∆llect ∆ll!', width / 2, height / 2 - 20);
+    
+    textSize(18);
+    fill(0, 255, 255);
+    text('MΞchanics:', width / 2, height / 2 + 20);
+    text('L1: 🌟 +10, 🕳️ -5 | L2: 🌟 +10, 🕳️ +5', width / 2, height / 2 + 40);
+    text('TimΞ: 60 SΞc/LΞvel ⏳', width / 2, height / 2 + 60);
+    
+    textSize(16);
+    text('C∆ntr∆ls: L1: ∆rr∆w KΞys ⊼ | L2: M∆use 🖱️ (3s L∆g)', width / 2, height / 2 + 90);
+    text('PrΞss S t∆ Start G∆me 🌌', width / 2, height / 2 + 120);
+    return;
+  }
+  
+  if (gameState === 'transition') {
+    // Transition screen between Level 1 and Level 2
+    textAlign(CENTER);
+    textSize(32);
+    fill(0, 255, 255);
+    text('LΞvel 1 C∆mplete! ⊼', width / 2, height / 2 - 40);
+    textSize(20);
+    fill(255, 255, 0);
+    text('Starting LΞvel 2... 🌌', width / 2, height / 2);
+    
+    transitionTimer -= 1 / frameRate();
+    if (transitionTimer <= 0) {
+      gameState = 'playing';
+    }
+    return;
+  }
+  
+  if (gameState === 'playing') {
+    // Update timer
+    timer -= 1 / frameRate();
+    if (timer <= 0) {
+      if (level === 1) {
+        level = 2;
+        transitionTimer = TRANSITION_TIME;
+        gameState = 'transition';
+        setupLevel2(); // Transition to Level 2
+      } else {
+        gameState = 'results'; // End game after Level 2
+      }
+    }
+    
+    if (level === 1) {
+      // Level 1: Original mechanics
+      fill(0, 255, 255); // Neon cyan
+      ellipse(player.x, player.y, player.size);
+      textAlign(CENTER);
+      textSize(12);
+      fill(255);
+      text('∆', player.x, player.y + 5); // Glyph on player
+      
+      // Move player with arrow keys
+      if (keyIsDown(LEFT_ARROW)) player.x -= player.speed;
+      if (keyIsDown(RIGHT_ARROW)) player.x += player.speed;
+      if (keyIsDown(UP_ARROW)) player.y -= player.speed;
+      if (keyIsDown(DOWN_ARROW)) player.y += player.speed;
+      player.x = constrain(player.x, 0, width);
+      player.y = constrain(player.y, 0, height);
+      
+      // Handle dreams
+      for (let i = dreams.length - 1; i >= 0; i--) {
+        let d = dreams[i];
+        fill(255, 255, 0);
+        ellipse(d.x, d.y, d.size);
+        text('🌟', d.x, d.y + 5);
+        
+        if (dist(player.x, player.y, d.x, d.y) < (player.size + d.size) / 2) {
+          score += DREAM_POINTS;
+          dreamsSeeded++;
+          dreams.splice(i, 1);
+          dreams.push(createDream());
+          showCommand('SEED DREAM 🌙', 100);
+        }
+      }
+      
+      // Handle vortexes
+      for (let i = vortexes.length - 1; i >= 0; i--) {
+        let v = vortexes[i];
+        push();
+        translate(v.x, v.y);
+        rotate(frameCount * 0.05);
+        fill(50, 0, 50);
+        ellipse(0, 0, v.size);
+        text('🕳️', 0, 5);
+        pop();
+        
+        if (dist(player.x, player.y, v.x, v.y) < (player.size + v.size) / 2) {
+          score -= VORTEX_PENALTY;
+          score = max(0, score);
+          vortexesHit++;
+          vortexes.splice(i, 1);
+          vortexes.push(createVortex());
+          showCommand('BLACKHOLEBURST_DISCONNECT.sh 🕳️', 100);
+        }
+      }
+    } else {
+      // Level 2: Pyramid with 3-second lag
+      // Record current mouse position with timestamp
+      mouseHistory.push({ x: mouseX, y: mouseY, time: millis() });
+      
+      // Remove mouse positions older than 3 seconds
+      while (mouseHistory.length > 0 && millis() - mouseHistory[0].time > LAG_TIME * 1000) {
+        mouseHistory.shift();
+      }
+      
+      // Set pyramid position to mouse position from 3 seconds ago
+      if (mouseHistory.length > 0) {
+        let lagIndex = 0; // Use the oldest position (approximately 3 seconds ago)
+        player.x = constrain(mouseHistory[lagIndex].x, 0, width);
+        player.y = constrain(mouseHistory[lagIndex].y, 0, height);
+      }
+      
+      // Draw player as pyramid
+      fill(0, 255, 255, 150); // Semi-transparent neon cyan
+      triangle(
+        player.x, player.y - player.size / 2, // Top
+        player.x - player.size / 2, player.y + player.size / 2, // Bottom left
+        player.x + player.size / 2, player.y + player.size / 2 // Bottom right
+      );
+      textAlign(CENTER);
+      textSize(12);
+      fill(255);
+      text('∆', player.x, player.y + 5); // Glyph on pyramid
+      
+      // Handle colorful balls
+      for (let i = balls.length - 1; i >= 0; i--) {
+        let b = balls[i];
+        b.x += b.speedX;
+        b.y += b.speedY;
+        
+        // Wrap around screen
+        if (b.x < 0) b.x = width;
+        if (b.x > width) b.x = 0;
+        if (b.y < 0) b.y = height;
+        if (b.y > height) b.y = 0;
+        
+        fill(b.color[0], b.color[1], b.color[2]);
+        ellipse(b.x, b.y, b.size);
+      }
+      
+      // Handle dreams
+      for (let i = dreams.length - 1; i >= 0; i--) {
+        let d = dreams[i];
+        fill(255, 255, 0);
+        ellipse(d.x, d.y, d.size);
+        text('🌟', d.x, d.y + 5);
+        
+        if (dist(player.x, player.y, d.x, d.y) < (player.size + d.size) / 2) {
+          score += DREAM_POINTS;
+          dreamsSeeded++;
+          dreams.splice(i, 1);
+          dreams.push(createDream());
+          showCommand('COLLECT DREAM 🌟', 100);
+        }
+      }
+      
+      // Handle vortexes (now collectible)
+      for (let i = vortexes.length - 1; i >= 0; i--) {
+        let v = vortexes[i];
+        push();
+        translate(v.x, v.y);
+        rotate(frameCount * 0.05);
+        fill(50, 0, 50);
+        ellipse(0, 0, v.size);
+        text('🕳️', 0, 5);
+        pop();
+        
+        if (dist(player.x, player.y, v.x, v.y) < (player.size + v.size) / 2) {
+          score += VORTEX_COLLECT_POINTS;
+          vortexesCollected++;
+          vortexes.splice(i, 1);
+          vortexes.push(createVortex());
+          showCommand('COLLECT VORTEX 🕳️', 100);
+        }
+      }
+    }
+    
+    // Display score, timer, and level
+    textAlign(LEFT);
+    textSize(16);
+    fill(0, 255, 255);
+    text(`Level: ${level} 🌌`, 10, 30);
+    text(`Score: ${score} 👾`, 10, 50);
+    text(`Time: ${ceil(timer)} ⏳`, 10, 70);
+  }
+  
+  if (gameState === 'results') {
+    // Results screen
+    textAlign(CENTER);
+    textSize(32);
+    fill(0, 255, 255);
+    text('G∆me ∆ver! 🌌', width / 2, height / 2 - 100);
+    
+    textSize(20);
+    fill(255, 255, 0);
+    text(`Final Sc∆re: ${score} ✨`, width / 2, height / 2 - 60);
+    text(`DrΞams SΞeded: ${dreamsSeeded} 🌟`, width / 2, height / 2 - 30);
+    text(`V∆rtexes Hit (L1): ${vortexesHit} 🕳️`, width / 2, height / 2);
+    text(`V∆rtexes C∆llected (L2): ${vortexesCollected} 🕳️`, width / 2, height / 2 + 30);
+    
+    textSize(16);
+    fill(0, 255, 255);
+    text('PrΞss R t∆ RΞstart 🔄', width / 2, height / 2 + 70);
+  }
+}
+
+function keyPressed() {
+  if (gameState === 'cover' && key === 's') {
+    gameState = 'playing';
+  }
+  if (gameState === 'results' && key === 'r') {
+    resetGame();
+  }
+}
+
+function createDream() {
+  return { x: random(width), y: random(height), size: 15 };
+}
+
+function createVortex() {
+  return { x: random(width), y: random(height), size: 25 };
+}
+
+function createBall() {
+  return {
+    x: random(width),
+    y: random(height),
+    size: 10,
+    speedX: random(-3, 3),
+    speedY: random(-3, 3),
+    color: [random(255), random(255), random(255)] // Random RGB color
+  };
+}
+
+function showCommand(cmd, frames) {
+  let cmdTimer = frames;
+  let drawCmd = () => {
+    textAlign(CENTER);
+    textSize(20);
+    fill(0, 255, 255, map(cmdTimer, 0, frames, 0, 255));
+    text(cmd, width / 2, height - 30);
+    cmdTimer--;
+    if (cmdTimer > 0) requestAnimationFrame(drawCmd);
+  };
+  drawCmd();
+}
+</script>
+</body>
+</html>
